@@ -23,30 +23,46 @@ const progressPercent = computed(() => {
   return (completedCount.value / quests.value.length) * 100
 })
 
-// Load saved state
-onMounted(() => {
-  const today = new Date().toDateString()
-  const savedDate = localStorage.getItem('questsDate')
-  
-  if (savedDate === today) {
-    const saved = localStorage.getItem('dailyQuests')
-    if (saved) {
-      const savedQuests = JSON.parse(saved)
+// Load saved state from server
+onMounted(async () => {
+  try {
+    const data = await $fetch('/api/user-data')
+    const today = new Date().toDateString()
+    
+    if (data && data.questsDate === today && data.quests) {
       quests.value.forEach((quest, index) => {
-        quest.completed = savedQuests[index]?.completed || false
+        quest.completed = data.quests[index]?.completed || false
       })
+    } else {
+      // New day, reset quests
+      resetQuests()
     }
-  } else {
-    // New day, reset quests
-    resetQuests()
+  } catch (error) {
+    console.error('Failed to load quests:', error)
   }
 })
 
-// Save state when changed
+// Save state to server when changed
+const saveQuests = async () => {
+  try {
+    const today = new Date().toDateString()
+    // Load current data first to preserve other fields
+    const currentData = await $fetch('/api/user-data')
+    await $fetch('/api/user-data', {
+      method: 'POST',
+      body: {
+        ...currentData,
+        quests: quests.value,
+        questsDate: today
+      }
+    })
+  } catch (error) {
+    console.error('Failed to save quests:', error)
+  }
+}
+
 watch(quests, () => {
-  const today = new Date().toDateString()
-  localStorage.setItem('questsDate', today)
-  localStorage.setItem('dailyQuests', JSON.stringify(quests.value))
+  saveQuests()
 }, { deep: true })
 
 const toggleQuest = (questId) => {

@@ -72,39 +72,29 @@ const loadEuropeNews = async () => {
   }
 }
 
-// Translate text from Korean to English
-const translateText = async (text) => {
-  if (!text || text.trim() === '') return text
-  
-  try {
-    const response = await $fetch('/api/translate', {
-      method: 'POST',
-      body: {
-        text: text,
-        targetLang: 'en'
-      }
-    })
-    
-    console.log('Translation:', text, '->', response.translatedText)
-    return response.translatedText || text
-  } catch (err) {
-    console.error('Translation error:', err)
-    return text
-  }
-}
+// Note: Korean news now uses English-language sources (Korea Herald, Korea Times)
+// No translation needed!
 
 // Load news for a specific region
-const loadRegionNews = async (region, regionCode, lang) => {
+const loadRegionNews = async (region, regionCode, lang, searchQuery = null) => {
   isLoading.value[region] = true
   errors.value[region] = null
   
   try {
+    // Build params object for API call
+    const params = {
+      lang: lang,
+      max: 6
+    }
+
+    if (searchQuery) {
+      params.search = searchQuery
+    } else {
+      params.region = regionCode
+    }
+
     const response = await $fetch('/api/news', {
-      params: {
-        region: regionCode,
-        lang: lang,
-        max: 6
-      }
+      params: params
     })
 
     if (response.error) {
@@ -119,41 +109,10 @@ const loadRegionNews = async (region, regionCode, lang) => {
         category: article.source.name,
         date: new Date(article.publishedAt).toLocaleDateString(),
         url: article.url,
-        image: article.image,
-        translating: region === 'korea' && lang === 'ko'
+        image: article.image
       }))
       
       newsData.value[region] = initialArticles
-      
-      // Then translate Korean news if needed
-      if (region === 'korea' && lang === 'ko') {
-        const translatedArticles = []
-        
-        for (let i = 0; i < response.articles.length; i++) {
-          const article = response.articles[i]
-          
-          const translatedTitle = await translateText(article.title)
-          const translatedDesc = article.description 
-            ? await translateText(article.description)
-            : 'No description available'
-          
-          translatedArticles.push({
-            id: `${region}-${i}`,
-            title: translatedTitle,
-            description: translatedDesc,
-            category: article.source.name,
-            date: new Date(article.publishedAt).toLocaleDateString(),
-            url: article.url,
-            image: article.image,
-            translating: false,
-            originalTitle: article.title,
-            originalDescription: article.description
-          })
-          
-          // Update progressively
-          newsData.value[region] = [...translatedArticles, ...initialArticles.slice(i + 1)]
-        }
-      }
     }
   } catch (err) {
     console.error(`Error loading ${region} news:`, err)
@@ -168,7 +127,8 @@ const loadRegionNews = async (region, regionCode, lang) => {
 onMounted(() => {
   loadRegionNews('us', 'us', 'en')
   loadEuropeNews()
-  loadRegionNews('korea', 'kr', 'ko')  // Changed to Korean language for better results
+  // Korean news temporarily disabled - work in progress
+  // loadRegionNews('korea', null, 'en', 'South Korea OR North Korea OR Seoul OR K-pop OR Samsung')
 })
 
 // Refresh news for a region
@@ -178,7 +138,8 @@ const refreshRegion = (region) => {
   } else if (region === 'europe') {
     loadEuropeNews()
   } else if (region === 'korea') {
-    loadRegionNews('korea', 'kr', 'ko')
+    // Korean news temporarily disabled - work in progress
+    console.log('Korean news section is under development')
   }
 }
 </script>
@@ -314,9 +275,11 @@ const refreshRegion = (region) => {
           <div class="section-title-group">
             <span class="section-icon">🇰🇷</span>
             <h2 class="section-title" style="color: #ff00ff;">Korean News</h2>
-            <span class="section-subtitle">Translated to English</span>
+            <span class="section-subtitle">English sources</span>
           </div>
+          <!-- Refresh button temporarily hidden -->
           <button 
+            v-if="false"
             class="refresh-btn" 
             @click="refreshRegion('korea')"
             :disabled="isLoading.korea"
@@ -336,7 +299,14 @@ const refreshRegion = (region) => {
           <p>Loading Korean news...</p>
         </div>
 
-        <div v-else class="news-grid">
+        <!-- Work in Progress Message -->
+        <div class="wip-message" style="border-color: #ff00ff;">
+          <div class="wip-icon">🚧</div>
+          <h3>Work in Progress</h3>
+          <p>Korean news section is currently under development. We're working on bringing you the latest news from Korea soon!</p>
+        </div>
+
+        <div v-if="false" class="news-grid">
           <a 
             v-for="article in newsData.korea" 
             :key="article.id"
@@ -526,6 +496,34 @@ const refreshRegion = (region) => {
 .loading-state {
   text-align: center;
   padding: 3rem 1rem;
+}
+
+.wip-message {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: rgba(255, 0, 255, 0.05);
+  border: 2px dashed;
+  border-radius: 12px;
+  margin: 1rem 0;
+}
+
+.wip-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.wip-message h3 {
+  font-size: 1.5rem;
+  color: #ff00ff;
+  margin-bottom: 0.75rem;
+}
+
+.wip-message p {
+  color: #b0b0c0;
+  font-size: 1rem;
+  max-width: 500px;
+  margin: 0 auto;
+  line-height: 1.6;
 }
 
 .spinner {

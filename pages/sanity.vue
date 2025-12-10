@@ -11,24 +11,27 @@ const counters = ref({
     icon: '🚫🍺',
     days: 0,
     color: '#00ffff',
-    milestone: 30,
-    lastReset: null
+    milestone: 7,
+    lastReset: null,
+    unit: 'days'
   },
   addiction: {
     name: 'Clean Streak',
     icon: '🧠',
     days: 0,
     color: '#ff00ff',
-    milestone: 90,
-    lastReset: null
+    milestone: 3,
+    lastReset: null,
+    unit: 'days'
   },
   sports: {
-    name: 'Consecutive Sports Days',
+    name: 'Sports Sessions',
     icon: '💪',
     days: 0,
     color: '#00ff88',
-    milestone: 21,
-    lastReset: null
+    milestone: 10,
+    lastReset: null,
+    unit: 'sessions'
   }
 })
 
@@ -199,7 +202,7 @@ const formatLastUpdate = (lastReset) => {
         <div class="counter-display">
           <div class="day-count">
             <span class="number">{{ counters.sports.days }}</span>
-            <span class="label">{{ counters.sports.days === 1 ? 'Day' : 'Days' }}</span>
+            <span class="label">{{ counters.sports.days === 1 ? 'Session' : 'Sessions' }}</span>
           </div>
           <div class="milestone-info">
             <span class="milestone-level">Level {{ getMilestoneLevel(counters.sports.days, counters.sports.milestone) }}</span>
@@ -218,14 +221,14 @@ const formatLastUpdate = (lastReset) => {
             </div>
           </div>
           <div class="progress-labels">
-            <span>{{ counters.sports.days % counters.sports.milestone }} / {{ counters.sports.milestone }} days</span>
+            <span>{{ counters.sports.days % counters.sports.milestone }} / {{ counters.sports.milestone }} sessions</span>
             <span>{{ Math.round(getProgress(counters.sports)) }}%</span>
           </div>
         </div>
 
         <div class="card-actions">
           <button class="action-btn decrement" @click="decrementDay('sports')">-1</button>
-          <button class="action-btn increment" @click="incrementDay('sports')">+1 Day</button>
+          <button class="action-btn increment" @click="incrementDay('sports')">+1 Session</button>
           <button class="action-btn reset" @click="resetCounter('sports')">Reset</button>
         </div>
       </div>
@@ -284,6 +287,7 @@ const formatLastUpdate = (lastReset) => {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 2rem;
   margin-bottom: 2rem;
+  align-items: stretch;
 }
 
 .counter-card {
@@ -294,6 +298,9 @@ const formatLastUpdate = (lastReset) => {
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
 }
 
 .counter-card::before {
@@ -388,6 +395,10 @@ const formatLastUpdate = (lastReset) => {
 
 .progress-section {
   margin-bottom: 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .progress-bar-container {

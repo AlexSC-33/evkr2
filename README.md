@@ -12,7 +12,7 @@ A dark futuristic personal dashboard built with Nuxt.js featuring gamification, 
 ### 📰 News (Free Access)
 - Real-time news from GNews API
 - Three regions: USA, Europe (UK, FR, DE, IT), Korea
-- Korean news automatically translated to English
+- Korean news from English-language sources (Korea Herald, Korea Times, etc.)
 - Clickable cards with images
 
 ### 🚀 DevOps Improvement (Free Access)

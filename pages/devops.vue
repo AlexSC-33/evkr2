@@ -7,82 +7,124 @@ const digest = ref<any>(null)
 const error = ref<string | null>(null)
 
 // Helper to sanitize and format text
-const sanitizeText = (text: string) => {
-  if (!text) return ''
-  return text
-    .replace(/<[^>]+>/g, '') // Remove any HTML tags
-    .replace(/&[a-z]+;/gi, (entity) => {
-      const entities: Record<string, string> = {
-        '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', 
-        '&quot;': '"', '&#39;': "'", '&apos;': "'"
-      }
-      return entities[entity.toLowerCase()] || entity
-    })
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .trim()
+const sanitizeText = (text: string | null | undefined) => {
+  try {
+    if (!text || typeof text !== 'string') return ''
+    return text
+      .replace(/<[^>]+>/g, '') // Remove any HTML tags
+      .replace(/&[a-z]+;/gi, (entity) => {
+        const entities: Record<string, string> = {
+          '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', 
+          '&quot;': '"', '&#39;': "'", '&apos;': "'"
+        }
+        return entities[entity.toLowerCase()] || entity
+      })
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim()
+  } catch (e) {
+    console.error('sanitizeText error:', e)
+    return String(text || '')
+  }
 }
 
 // Load cached digest from localStorage
 onMounted(() => {
-  const cached = localStorage.getItem('devopsDigest')
-  if (cached) {
-    const data = JSON.parse(cached)
-    digest.value = data.digest
-    lastUpdate.value = data.timestamp
+  try {
+    const cached = localStorage.getItem('devopsDigest')
+    if (cached) {
+      console.log('📦 Loading cached digest...')
+      const data = JSON.parse(cached)
+      if (data && data.digest && data.timestamp) {
+        digest.value = data.digest
+        lastUpdate.value = data.timestamp
+        console.log('✅ Cached digest loaded successfully')
+      } else {
+        console.warn('⚠️ Invalid cached data format, clearing cache')
+        localStorage.removeItem('devopsDigest')
+      }
+    }
+  } catch (e) {
+    console.error('❌ Error loading cached digest:', e)
+    // Clear corrupted cache
+    try {
+      localStorage.removeItem('devopsDigest')
+    } catch (clearErr) {
+      console.error('Failed to clear cache:', clearErr)
+    }
   }
 })
 
 // Check if digest is stale (older than 7 days)
 const isStale = computed(() => {
-  if (!lastUpdate.value) return true
-  const lastUpdateTime = new Date(lastUpdate.value).getTime()
-  const now = new Date().getTime()
-  const weekInMs = 7 * 24 * 60 * 60 * 1000
-  return (now - lastUpdateTime) > weekInMs
+  try {
+    if (!lastUpdate.value) return true
+    const lastUpdateTime = new Date(lastUpdate.value).getTime()
+    const now = new Date().getTime()
+    const weekInMs = 7 * 24 * 60 * 60 * 1000
+    return (now - lastUpdateTime) > weekInMs
+  } catch (e) {
+    console.error('isStale error:', e)
+    return false
+  }
 })
 
 const timeAgo = computed(() => {
-  if (!lastUpdate.value) return 'Never'
-  const lastUpdateTime = new Date(lastUpdate.value).getTime()
-  const now = new Date().getTime()
-  const diffInMs = now - lastUpdateTime
-  
-  const minutes = Math.floor(diffInMs / (1000 * 60))
-  const hours = Math.floor(diffInMs / (1000 * 60 * 60))
-  const days = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
-  
-  if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`
-  if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`
-  if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
-  return 'Just now'
+  try {
+    if (!lastUpdate.value) return 'Never'
+    const lastUpdateTime = new Date(lastUpdate.value).getTime()
+    const now = new Date().getTime()
+    const diffInMs = now - lastUpdateTime
+    
+    const minutes = Math.floor(diffInMs / (1000 * 60))
+    const hours = Math.floor(diffInMs / (1000 * 60 * 60))
+    const days = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
+    
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`
+    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
+    return 'Just now'
+  } catch (e) {
+    console.error('timeAgo error:', e)
+    return 'Unknown'
+  }
 })
 
 const fetchDigest = async () => {
-  isLoading.value = true
-  error.value = null
-  
   try {
+    isLoading.value = true
+    error.value = null
+    
+    console.log('🚀 Starting digest fetch...')
     const response = await $fetch('/api/devops-digest', {
       method: 'POST'
     })
     
+    console.log('✅ Received response:', response)
+    
     if (response.error) {
       error.value = response.message || 'Failed to generate digest'
-    } else {
+    } else if (response.digest) {
       digest.value = response.digest
       lastUpdate.value = new Date().toISOString()
       
       // Cache the result
-      localStorage.setItem('devopsDigest', JSON.stringify({
-        digest: response.digest,
-        timestamp: lastUpdate.value
-      }))
+      try {
+        localStorage.setItem('devopsDigest', JSON.stringify({
+          digest: response.digest,
+          timestamp: lastUpdate.value
+        }))
+      } catch (storageErr) {
+        console.warn('Failed to cache digest:', storageErr)
+      }
+    } else {
+      error.value = 'Invalid response format'
     }
   } catch (err: any) {
-    console.error('Error fetching digest:', err)
+    console.error('❌ Error fetching digest:', err)
     error.value = err?.message || 'Failed to fetch DevOps digest'
   } finally {
     isLoading.value = false
+    console.log('✨ Digest fetch complete')
   }
 }
 
@@ -121,21 +163,19 @@ const getCategoryColor = (category: string) => {
           <h1 class="page-title">DevOps Improvement</h1>
           <p class="page-subtitle">AI-curated insights from the DevOps ecosystem</p>
         </div>
-        <button 
-          class="refresh-btn"
-          @click="fetchDigest"
-          :disabled="isLoading"
-          :class="{ stale: isStale }"
-        >
-          <span class="refresh-icon" :class="{ spinning: isLoading }">↻</span>
-          <span class="refresh-text">{{ isLoading ? 'Generating...' : 'Refresh Digest' }}</span>
-        </button>
       </div>
       
-      <div class="update-info">
+      <div v-if="digest" class="update-info">
         <span class="update-label">Last Updated:</span>
         <span class="update-time">{{ timeAgo }}</span>
-        <span v-if="isStale" class="stale-badge">⚠️ Stale - Please refresh</span>
+        <button 
+          class="refresh-btn-simple"
+          @click="fetchDigest"
+          :disabled="isLoading"
+        >
+          <span v-if="isLoading">⏳ Refreshing...</span>
+          <span v-else>↻ Refresh</span>
+        </button>
       </div>
     </header>
 
@@ -191,35 +231,35 @@ const getCategoryColor = (category: string) => {
           <span class="summary-icon">📋</span>
           <h2>Executive Summary</h2>
         </div>
-        <p class="summary-text">{{ sanitizeText(digest.summary) }}</p>
+        <p class="summary-text">{{ digest.summary ? sanitizeText(digest.summary) : '' }}</p>
       </div>
 
       <!-- Categories -->
-      <div v-if="digest.categories" class="categories-grid">
+      <div v-if="digest.categories && Array.isArray(digest.categories)" class="categories-grid">
         <div 
           v-for="(category, index) in digest.categories" 
-          :key="index"
+          :key="`category-${index}-${category.name || 'unknown'}`"
           class="category-card"
-          :style="{ '--category-color': getCategoryColor(category.name) }"
+          :style="{ '--category-color': getCategoryColor(category?.name || 'general') }"
         >
           <div class="category-header">
-            <span class="category-icon">{{ getCategoryIcon(category.name) }}</span>
+            <span class="category-icon">{{ getCategoryIcon(category?.name || 'general') }}</span>
             <h3 class="category-title">{{ category.name }}</h3>
             <span class="category-count">{{ category.items?.length || 0 }} items</span>
           </div>
           
-          <div v-if="category.items && category.items.length > 0" class="category-items">
+          <div v-if="category.items && Array.isArray(category.items) && category.items.length > 0" class="category-items">
             <div 
               v-for="(item, itemIndex) in category.items" 
-              :key="itemIndex"
+              :key="`item-${index}-${itemIndex}-${item.url || itemIndex}`"
               class="item-card"
             >
-              <h4 class="item-title">{{ sanitizeText(item.title) }}</h4>
-              <p class="item-description">{{ sanitizeText(item.description) }}</p>
+              <h4 class="item-title">{{ item?.title ? sanitizeText(item.title) : 'No title' }}</h4>
+              <p class="item-description">{{ item?.description ? sanitizeText(item.description) : '' }}</p>
               <div class="item-meta">
-                <span v-if="item.source" class="item-source">{{ item.source }}</span>
-                <span v-if="item.date" class="item-date">{{ new Date(item.date).toLocaleDateString() }}</span>
-                <a v-if="item.url" :href="item.url" target="_blank" class="item-link">
+                <span v-if="item?.source" class="item-source">{{ item.source }}</span>
+                <span v-if="item?.date" class="item-date">{{ item.date }}</span>
+                <a v-if="item?.url" :href="item.url" target="_blank" class="item-link">
                   Read more →
                 </a>
               </div>
@@ -254,6 +294,8 @@ const getCategoryColor = (category: string) => {
   margin-bottom: 2rem;
   padding-bottom: 1.5rem;
   border-bottom: 2px solid #1e1e3f;
+  position: relative;
+  z-index: 100;
 }
 
 .header-top {
@@ -263,6 +305,8 @@ const getCategoryColor = (category: string) => {
   gap: 2rem;
   margin-bottom: 1rem;
   flex-wrap: wrap;
+  position: relative;
+  z-index: 100;
 }
 
 .title-group {
@@ -285,49 +329,27 @@ const getCategoryColor = (category: string) => {
   font-weight: 300;
 }
 
-.refresh-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.875rem 1.5rem;
+.refresh-btn-simple {
+  padding: 0.6rem 1.2rem;
   background: linear-gradient(135deg, #00ffff 0%, #00cccc 100%);
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   color: #0a0a0f;
-  font-size: 0.95rem;
-  font-weight: 700;
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   white-space: nowrap;
 }
 
-.refresh-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(0, 255, 255, 0.4);
+.refresh-btn-simple:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 255, 255, 0.4);
 }
 
-.refresh-btn:disabled {
+.refresh-btn-simple:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.refresh-btn.stale {
-  background: linear-gradient(135deg, #ff9900 0%, #ff6600 100%);
-  animation: pulse-warning 2s ease-in-out infinite;
-}
-
-@keyframes pulse-warning {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.refresh-icon {
-  font-size: 1.3rem;
-  transition: transform 0.3s ease;
-}
-
-.refresh-icon.spinning {
-  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {

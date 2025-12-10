@@ -18,6 +18,10 @@ logs
 .fleet
 .idea
 
+# User data storage
+data/
+!data/.gitkeep
+
 # Local env files
 .env
 .env.*

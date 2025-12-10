@@ -50,18 +50,41 @@ const getRankColor = (family) => {
   return colors[family] || '#00ffff'
 }
 
-// Load saved XP from localStorage
-onMounted(() => {
-  const saved = localStorage.getItem('userXP')
-  if (saved) {
-    currentXP.value = parseInt(saved)
+// Load saved XP from server
+onMounted(async () => {
+  try {
+    const data = await $fetch('/api/user-data')
+    if (data && data.xp) {
+      currentXP.value = data.xp
+    }
+  } catch (error) {
+    console.error('Failed to load XP:', error)
   }
 })
+
+// Save XP to server
+const saveXP = async () => {
+  try {
+    // Small delay to avoid race condition with quest saving
+    await new Promise(resolve => setTimeout(resolve, 100))
+    // Load current data first to preserve other fields
+    const currentData = await $fetch('/api/user-data')
+    await $fetch('/api/user-data', {
+      method: 'POST',
+      body: { 
+        ...currentData,
+        xp: currentXP.value 
+      }
+    })
+  } catch (error) {
+    console.error('Failed to save XP:', error)
+  }
+}
 
 // Add XP (called from parent)
 const addXP = (amount) => {
   currentXP.value += amount
-  localStorage.setItem('userXP', currentXP.value.toString())
+  saveXP()
 }
 
 // Expose method to parent

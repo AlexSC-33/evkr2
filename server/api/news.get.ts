@@ -10,16 +10,25 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  const { region = 'us', lang = 'en', max = 10 } = query
+  const { region = 'us', lang = 'en', max = 10, search = null } = query
 
   try {
-    const response = await $fetch(`https://gnews.io/api/v4/top-headlines`, {
-      params: {
-        apikey: apiKey,
-        country: region,
-        lang: lang,
-        max: max
-      }
+    // If search query is provided, use search endpoint instead of top-headlines
+    const endpoint = search ? 'search' : 'top-headlines'
+    const params: any = {
+      apikey: apiKey,
+      lang: lang,
+      max: max
+    }
+
+    if (search) {
+      params.q = search
+    } else {
+      params.country = region
+    }
+
+    const response = await $fetch(`https://gnews.io/api/v4/${endpoint}`, {
+      params: params
     })
 
     return response
