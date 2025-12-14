@@ -19,6 +19,52 @@ const errors = ref({
   korea: null
 })
 
+const lastUpdated = ref({
+  us: null,
+  europe: null,
+  korea: null
+})
+
+// Cache keys for localStorage
+const CACHE_KEYS = {
+  us: 'news_cache_us',
+  europe: 'news_cache_europe',
+  korea: 'news_cache_korea',
+  timestamps: 'news_cache_timestamps'
+}
+
+// Load news from cache
+const loadFromCache = () => {
+  try {
+    const timestamps = JSON.parse(localStorage.getItem(CACHE_KEYS.timestamps) || '{}')
+    
+    Object.keys(newsData.value).forEach(region => {
+      const cached = localStorage.getItem(CACHE_KEYS[region])
+      if (cached) {
+        newsData.value[region] = JSON.parse(cached)
+        lastUpdated.value[region] = timestamps[region] ? new Date(timestamps[region]) : null
+      }
+    })
+  } catch (err) {
+    console.error('Error loading cached news:', err)
+  }
+}
+
+// Save news to cache
+const saveToCache = (region, articles) => {
+  try {
+    localStorage.setItem(CACHE_KEYS[region], JSON.stringify(articles))
+    
+    const timestamps = JSON.parse(localStorage.getItem(CACHE_KEYS.timestamps) || '{}')
+    timestamps[region] = new Date().toISOString()
+    localStorage.setItem(CACHE_KEYS.timestamps, JSON.stringify(timestamps))
+    
+    lastUpdated.value[region] = new Date()
+  } catch (err) {
+    console.error('Error saving to cache:', err)
+  }
+}
+
 // Load news from multiple European countries
 const loadEuropeNews = async () => {
   isLoading.value.europe = true
@@ -62,6 +108,9 @@ const loadEuropeNews = async () => {
         url: article.url,
         image: article.image
       }))
+      
+      // Save to cache
+      saveToCache('europe', newsData.value.europe)
     }
   } catch (err) {
     console.error('Error loading Europe news:', err)
@@ -113,6 +162,9 @@ const loadRegionNews = async (region, regionCode, lang, searchQuery = null) => {
       }))
       
       newsData.value[region] = initialArticles
+      
+      // Save to cache
+      saveToCache(region, initialArticles)
     }
   } catch (err) {
     console.error(`Error loading ${region} news:`, err)
@@ -123,12 +175,9 @@ const loadRegionNews = async (region, regionCode, lang, searchQuery = null) => {
   }
 }
 
-// Load all news on mount
+// Load cached news on mount, no API calls
 onMounted(() => {
-  loadRegionNews('us', 'us', 'en')
-  loadEuropeNews()
-  // Korean news temporarily disabled - work in progress
-  // loadRegionNews('korea', null, 'en', 'South Korea OR North Korea OR Seoul OR K-pop OR Samsung')
+  loadFromCache()
 })
 
 // Refresh news for a region
@@ -141,6 +190,19 @@ const refreshRegion = (region) => {
     // Korean news temporarily disabled - work in progress
     console.log('Korean news section is under development')
   }
+}
+
+// Format last updated time
+const formatLastUpdated = (date) => {
+  if (!date) return 'Never updated - Click refresh to load news'
+  
+  const now = new Date()
+  const diff = Math.floor((now - date) / 1000) // seconds
+  
+  if (diff < 60) return 'Just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`
+  return `${Math.floor(diff / 86400)} days ago`
 }
 </script>
 
@@ -157,7 +219,10 @@ const refreshRegion = (region) => {
         <div class="section-header">
           <div class="section-title-group">
             <span class="section-icon">🇺🇸</span>
-            <h2 class="section-title" style="color: #00ffff;">USA News</h2>
+            <div>
+              <h2 class="section-title" style="color: #00ffff;">USA News</h2>
+              <span class="last-updated">{{ formatLastUpdated(lastUpdated.us) }}</span>
+            </div>
           </div>
           <button 
             class="refresh-btn" 
@@ -215,8 +280,11 @@ const refreshRegion = (region) => {
         <div class="section-header">
           <div class="section-title-group">
             <span class="section-icon">🇪🇺</span>
-            <h2 class="section-title" style="color: #00ff88;">Europe News</h2>
-            <span class="section-subtitle">UK • France • Germany • Italy</span>
+            <div>
+              <h2 class="section-title" style="color: #00ff88;">Europe News</h2>
+              <span class="section-subtitle">UK • France • Germany • Italy</span>
+              <span class="last-updated">{{ formatLastUpdated(lastUpdated.europe) }}</span>
+            </div>
           </div>
           <button 
             class="refresh-btn" 
@@ -431,6 +499,15 @@ const refreshRegion = (region) => {
   color: #8b8b9f;
   font-weight: 400;
   margin-left: 0.5rem;
+}
+
+.last-updated {
+  display: block;
+  font-size: 0.75rem;
+  color: #6b6b7f;
+  font-weight: 400;
+  margin-top: 0.25rem;
+  font-style: italic;
 }
 
 .refresh-btn {

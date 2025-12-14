@@ -33,6 +33,8 @@ const botBalanceInput = ref(0)
 // UI states
 const isLoading = ref(false)
 const showAddModal = ref(false)
+const showBotInvestmentModal = ref(false)
+const showBotBalanceModal = ref(false)
 const currentPortfolio = ref(null)
 const newAsset = ref({
   symbol: '',
@@ -57,6 +59,54 @@ onMounted(async () => {
 const savePortfolios = () => {
   localStorage.setItem('finn2025-portfolios', JSON.stringify(portfolios.value))
 }
+
+// Group assets by symbol for better display
+const groupedCTOAssets = computed(() => {
+  const assets = portfolios.value.cto.assets
+  if (!assets || assets.length === 0) return []
+
+  const grouped = {}
+  
+  assets.forEach((asset, index) => {
+    if (!grouped[asset.symbol]) {
+      grouped[asset.symbol] = {
+        symbol: asset.symbol,
+        name: asset.name,
+        positions: [],
+        totalQuantity: 0,
+        totalInvested: 0,
+        currentValue: 0,
+        avgBuyPrice: 0,
+        currentPrice: asset.currentPrice || asset.buyPrice
+      }
+    }
+    
+    const invested = asset.quantity * asset.buyPrice
+    const currentVal = asset.quantity * (asset.currentPrice || asset.buyPrice)
+    
+    grouped[asset.symbol].positions.push({
+      index: index,
+      quantity: asset.quantity,
+      buyPrice: asset.buyPrice,
+      invested: invested,
+      currentValue: currentVal
+    })
+    
+    grouped[asset.symbol].totalQuantity += asset.quantity
+    grouped[asset.symbol].totalInvested += invested
+    grouped[asset.symbol].currentValue += currentVal
+    grouped[asset.symbol].currentPrice = asset.currentPrice || asset.buyPrice
+  })
+
+  // Calculate average buy price
+  Object.values(grouped).forEach(group => {
+    group.avgBuyPrice = group.totalInvested / group.totalQuantity
+    group.profit = group.currentValue - group.totalInvested
+    group.profitPercent = (group.profit / group.totalInvested) * 100
+  })
+
+  return Object.values(grouped)
+})
 
 // Calculate total stats for each portfolio
 const calculateStats = (portfolio) => {
@@ -217,6 +267,7 @@ const addBotInvestment = () => {
   })
 
   botInvestmentInput.value = 0
+  showBotInvestmentModal.value = false
   savePortfolios()
 }
 
@@ -236,6 +287,7 @@ const updateBotBalance = () => {
   })
 
   botBalanceInput.value = 0
+  showBotBalanceModal.value = false
   savePortfolios()
 }
 
@@ -355,35 +407,66 @@ const overallStats = computed(() => {
           <div v-if="portfolios.cto.assets.length === 0" class="empty-state">
             No stocks added yet
           </div>
-          <div v-for="(asset, index) in portfolios.cto.assets" :key="index" class="asset-item">
-            <div class="asset-info">
-              <span class="asset-symbol">{{ asset.symbol }}</span>
-              <span class="asset-name">{{ asset.name }}</span>
-            </div>
-            <div class="asset-details">
-              <div class="detail-row">
-                <span class="quantity">{{ asset.quantity }} shares for {{ formatCurrency(asset.quantity * asset.buyPrice) }}</span>
+          
+          <!-- Grouped Stock Display -->
+          <div v-for="group in groupedCTOAssets" :key="group.symbol" class="stock-group">
+            <div class="stock-group-header">
+              <div class="stock-main-info">
+                <span class="stock-symbol">{{ group.symbol }}</span>
+                <span class="stock-name">{{ group.name }}</span>
               </div>
-              <div class="detail-row">
-                <span class="current-price">Current: {{ formatCurrency(asset.currentPrice || asset.buyPrice) }}/share</span>
-                <span class="current-total">Value: {{ formatCurrency(asset.quantity * (asset.currentPrice || asset.buyPrice)) }}</span>
-              </div>
-              <div class="detail-row profit-row">
-                <span 
-                  class="asset-pl" 
-                  :class="{ profit: (asset.quantity * (asset.currentPrice || asset.buyPrice)) >= (asset.quantity * asset.buyPrice), loss: (asset.quantity * (asset.currentPrice || asset.buyPrice)) < (asset.quantity * asset.buyPrice) }"
-                >
-                  {{ formatPercent(((asset.quantity * (asset.currentPrice || asset.buyPrice)) - (asset.quantity * asset.buyPrice)) / (asset.quantity * asset.buyPrice) * 100) }}
-                </span>
-                <span 
-                  class="profit-amount"
-                  :class="{ profit: (asset.quantity * (asset.currentPrice || asset.buyPrice)) >= (asset.quantity * asset.buyPrice), loss: (asset.quantity * (asset.currentPrice || asset.buyPrice)) < (asset.quantity * asset.buyPrice) }"
-                >
-                  {{ formatCurrency((asset.quantity * (asset.currentPrice || asset.buyPrice)) - (asset.quantity * asset.buyPrice)) }}
-                </span>
+              <div class="stock-summary">
+                <div class="summary-item">
+                  <span class="summary-label">Total Shares</span>
+                  <span class="summary-value">{{ group.totalQuantity.toFixed(4) }}</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Avg Buy Price</span>
+                  <span class="summary-value">{{ formatCurrency(group.avgBuyPrice) }}</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Current Price</span>
+                  <span class="summary-value">{{ formatCurrency(group.currentPrice) }}</span>
+                </div>
               </div>
             </div>
-            <button class="remove-btn" @click="removeAsset('cto', index)">×</button>
+
+            <div class="stock-totals">
+              <div class="total-item">
+                <span class="total-label">Total Invested</span>
+                <span class="total-value">{{ formatCurrency(group.totalInvested) }}</span>
+              </div>
+              <div class="total-item">
+                <span class="total-label">Current Value</span>
+                <span class="total-value">{{ formatCurrency(group.currentValue) }}</span>
+              </div>
+              <div class="total-item highlight" :class="{ profit: group.profit >= 0, loss: group.profit < 0 }">
+                <span class="total-label">Profit/Loss</span>
+                <div class="pl-values">
+                  <span class="pl-amount">{{ formatCurrency(group.profit) }}</span>
+                  <span class="pl-percent">{{ formatPercent(group.profitPercent) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Individual Positions -->
+            <div v-if="group.positions.length > 1" class="positions-toggle">
+              <details>
+                <summary>{{ group.positions.length }} positions • Click to expand</summary>
+                <div class="positions-list">
+                  <div v-for="position in group.positions" :key="position.index" class="position-item">
+                    <div class="position-info">
+                      <span class="position-qty">{{ position.quantity.toFixed(4) }} shares @ {{ formatCurrency(position.buyPrice) }}</span>
+                      <span class="position-invested">Invested: {{ formatCurrency(position.invested) }}</span>
+                    </div>
+                    <button class="remove-btn-small" @click="removeAsset('cto', position.index)">×</button>
+                  </div>
+                </div>
+              </details>
+            </div>
+            <div v-else class="single-position-actions">
+              <button class="remove-btn-inline" @click="removeAsset('cto', group.positions[0].index)">Remove Position</button>
+            </div>
           </div>
         </div>
       </div>
@@ -451,67 +534,77 @@ const overallStats = computed(() => {
       <div class="portfolio-card" :style="{ '--card-color': portfolios.bot.color }">
         <div class="card-header">
           <h2>{{ portfolios.bot.name }}</h2>
-        </div>
-
-        <div class="bot-controls">
-          <div class="bot-input-group">
-            <label>💰 Add Investment</label>
-            <div class="input-with-btn">
-              <input 
-                v-model.number="botInvestmentInput" 
-                type="number" 
-                step="0.01" 
-                placeholder="Amount to invest"
-                @keyup.enter="addBotInvestment"
-              >
-              <button class="inline-btn" @click="addBotInvestment">Add</button>
-            </div>
-          </div>
-          <div class="bot-input-group">
-            <label>📊 Update Current Balance</label>
-            <div class="input-with-btn">
-              <input 
-                v-model.number="botBalanceInput" 
-                type="number" 
-                step="0.01" 
-                placeholder="Current balance"
-                @keyup.enter="updateBotBalance"
-              >
-              <button class="inline-btn" @click="updateBotBalance">Update</button>
-            </div>
+          <div class="bot-header-actions">
+            <button class="add-btn" @click="showBotInvestmentModal = true">+ Add Investment</button>
+            <button class="add-btn" @click="showBotBalanceModal = true">Update Balance</button>
           </div>
         </div>
 
-        <div class="portfolio-stats bot-stats">
+        <div class="portfolio-stats">
           <div class="stat">
-            <span class="label">Total Invested:</span>
+            <span class="label">Invested:</span>
             <span class="value">{{ formatEuro(portfolios.bot.totalInvested || 0) }}</span>
           </div>
           <div class="stat">
-            <span class="label">Current Balance:</span>
+            <span class="label">Current:</span>
             <span class="value">{{ formatEuro(portfolios.bot.currentBalance || 0) }}</span>
           </div>
           <div class="stat" :class="{ profit: (portfolios.bot.currentBalance || 0) >= (portfolios.bot.totalInvested || 0), loss: (portfolios.bot.currentBalance || 0) < (portfolios.bot.totalInvested || 0) }">
             <span class="label">P&L:</span>
-            <span class="value">{{ formatEuro((portfolios.bot.currentBalance || 0) - (portfolios.bot.totalInvested || 0)) }}</span>
-            <span class="percent">{{ formatPercent(portfolios.bot.totalInvested > 0 ? ((portfolios.bot.currentBalance || 0) - (portfolios.bot.totalInvested || 0)) / portfolios.bot.totalInvested * 100 : 0) }}</span>
+            <span class="value">{{ formatPercent(portfolios.bot.totalInvested > 0 ? ((portfolios.bot.currentBalance || 0) - (portfolios.bot.totalInvested || 0)) / portfolios.bot.totalInvested * 100 : 0) }}</span>
           </div>
         </div>
 
-        <div class="bot-history">
-          <h4>Investment History</h4>
-          <div class="history-list">
-            <div v-if="!portfolios.bot.history || portfolios.bot.history.length === 0" class="empty-state">
-              No investments yet
+        <div class="assets-list">
+          <div v-if="!portfolios.bot.history || portfolios.bot.history.length === 0" class="empty-state">
+            No transactions yet
+          </div>
+          <div v-for="(entry, index) in portfolios.bot.history" :key="index" class="asset-item bot-entry">
+            <div class="asset-info">
+              <span class="asset-symbol">{{ entry.type === 'investment' ? '💰 Investment' : '📊 Balance Update' }}</span>
+              <span class="asset-name">{{ new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }}</span>
             </div>
-            <div v-for="(entry, index) in portfolios.bot.history" :key="index" class="history-item">
-              <span class="history-date">{{ new Date(entry.date).toLocaleDateString() }}</span>
-              <span class="history-type" :class="entry.type">{{ entry.type === 'investment' ? '💰' : '📊' }}</span>
-              <span class="history-label">{{ entry.type === 'investment' ? 'Invested' : 'Balance' }}</span>
-              <span class="history-amount">{{ formatEuro(entry.amount) }}</span>
+            <div class="asset-details">
+              <div class="detail-row">
+                <span class="bot-entry-amount">{{ formatEuro(entry.amount) }}</span>
+              </div>
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Bot Investment Modal -->
+    <div v-if="showBotInvestmentModal" class="modal-overlay" @click.self="showBotInvestmentModal = false">
+      <div class="modal">
+        <h3>Add Investment</h3>
+        <form @submit.prevent="addBotInvestment">
+          <div class="form-group">
+            <label>Amount (EUR)</label>
+            <input v-model.number="botInvestmentInput" type="number" step="0.01" placeholder="500.00" required autofocus>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="cancel-btn" @click="showBotInvestmentModal = false">Cancel</button>
+            <button type="submit" class="submit-btn">Add Investment</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Bot Balance Modal -->
+    <div v-if="showBotBalanceModal" class="modal-overlay" @click.self="showBotBalanceModal = false">
+      <div class="modal">
+        <h3>Update Current Balance</h3>
+        <form @submit.prevent="updateBotBalance">
+          <div class="form-group">
+            <label>Current Balance (EUR)</label>
+            <input v-model.number="botBalanceInput" type="number" step="0.01" placeholder="550.00" required autofocus>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="cancel-btn" @click="showBotBalanceModal = false">Cancel</button>
+            <button type="submit" class="submit-btn">Update Balance</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -760,8 +853,8 @@ const overallStats = computed(() => {
 .assets-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  max-height: 400px;
+  gap: 1rem;
+  max-height: 500px;
   overflow-y: auto;
 }
 
@@ -771,6 +864,270 @@ const overallStats = computed(() => {
   padding: 2rem;
   font-style: italic;
 }
+
+/* Grouped Stock Display */
+.stock-group {
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid #1e1e3f;
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: all 0.3s ease;
+}
+
+.stock-group:hover {
+  border-color: var(--card-color);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+}
+
+.stock-group-header {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #1e1e3f;
+}
+
+.stock-main-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.stock-symbol {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 0 10px var(--card-color);
+}
+
+.stock-name {
+  color: #8b8b9f;
+  font-size: 1rem;
+}
+
+.stock-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.summary-label {
+  color: #6b6b7f;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-value {
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.stock-totals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.total-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.total-item.highlight {
+  padding: 0.5rem;
+  border-radius: 6px;
+}
+
+.total-item.highlight.profit {
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid #00ff88;
+}
+
+.total-item.highlight.loss {
+  background: rgba(255, 0, 85, 0.1);
+  border: 1px solid #ff0055;
+}
+
+.total-label {
+  color: #8b8b9f;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.total-value {
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.pl-values {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pl-amount {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.profit .pl-amount,
+.profit .pl-percent {
+  color: #00ff88;
+}
+
+.loss .pl-amount,
+.loss .pl-percent {
+  color: #ff0055;
+}
+
+.pl-percent {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.positions-toggle {
+  margin-top: 0.75rem;
+}
+
+.positions-toggle details {
+  cursor: pointer;
+}
+
+.positions-toggle summary {
+  color: #8b8b9f;
+  font-size: 0.85rem;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  transition: all 0.3s ease;
+}
+
+.positions-toggle summary:hover {
+  background: rgba(0, 0, 0, 0.4);
+  color: #ffffff;
+}
+
+.positions-toggle summary::before {
+  content: '▶';
+  margin-right: 0.5rem;
+  transition: transform 0.3s ease;
+}
+
+.positions-toggle details[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.positions-list {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.position-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.position-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.position-qty {
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.position-invested {
+  color: #8b8b9f;
+  font-size: 0.8rem;
+}
+
+.remove-btn-small {
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 0, 85, 0.2);
+  border: 1px solid #ff0055;
+  border-radius: 50%;
+  color: #ff0055;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  transition: all 0.3s ease;
+}
+
+.remove-btn-small:hover {
+  background: #ff0055;
+  color: white;
+}
+
+.single-position-actions {
+  margin-top: 0.75rem;
+}
+
+.remove-btn-inline {
+  width: 100%;
+  padding: 0.5rem;
+  background: rgba(255, 0, 85, 0.1);
+  border: 1px solid #ff0055;
+  border-radius: 6px;
+  color: #ff0055;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.remove-btn-inline:hover {
+  background: #ff0055;
+  color: white;
+}
+
+/* Bot Header Actions */
+.bot-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Bot Entry Styles */
+.bot-entry .asset-info {
+  min-width: 200px;
+}
+
+.bot-entry-amount {
+  color: #ffff00;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* Modal Styles */
 
 .asset-item {
   background: rgba(0, 0, 0, 0.3);

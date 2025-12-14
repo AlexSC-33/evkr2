@@ -11,6 +11,22 @@ const isFreeAccess = computed(() => authCookie.value === 'free')
 const showAuthModal = ref(false)
 const redirectPath = ref('')
 
+// Finn section state
+const finnExpanded = ref(false)
+
+// Check if current route is in Finn section
+const isFinnRoute = computed(() => {
+  const path = route.path
+  return path.startsWith('/finn-')
+})
+
+// Auto-expand Finn section if on a Finn page
+watch(() => route.path, (newPath) => {
+  if (newPath.startsWith('/finn-')) {
+    finnExpanded.value = true
+  }
+}, { immediate: true })
+
 // Check if auth modal should be shown on mount
 onMounted(() => {
   if (route.query.showAuth === 'true') {
@@ -31,6 +47,10 @@ const handleLogin = () => {
 
 const handleAuthenticated = () => {
   // Cookie is already set in AuthModal component
+}
+
+const toggleFinn = () => {
+  finnExpanded.value = !finnExpanded.value
 }
 </script>
 
@@ -60,13 +80,43 @@ const handleAuthenticated = () => {
               <span>DevOps</span>
             </NuxtLink>
           </li>
-          <li>
-            <NuxtLink to="/finn-2025" class="nav-item" active-class="active">
+          
+          <!-- Finn Section with Dropdown -->
+          <li class="nav-section">
+            <div 
+              @click="toggleFinn" 
+              class="nav-item nav-dropdown" 
+              :class="{ active: isFinnRoute, expanded: finnExpanded }"
+            >
               <span class="icon">📊</span>
-              <span>Finn 2025</span>
+              <span>Finn</span>
+              <span class="dropdown-arrow">{{ finnExpanded ? '▼' : '▶' }}</span>
               <span v-if="!isAuthenticated" class="lock-badge">🔒</span>
-            </NuxtLink>
+            </div>
+            <transition name="dropdown">
+              <ul v-if="finnExpanded" class="dropdown-menu">
+                <li>
+                  <NuxtLink to="/finn-2025" class="nav-item nav-subitem" active-class="active">
+                    <span class="icon">📈</span>
+                    <span>Finn 2025</span>
+                  </NuxtLink>
+                </li>
+                <li>
+                  <NuxtLink to="/finn-2026" class="nav-item nav-subitem" active-class="active">
+                    <span class="icon">📉</span>
+                    <span>Finn 2026</span>
+                  </NuxtLink>
+                </li>
+                <li>
+                  <NuxtLink to="/finn-alerts" class="nav-item nav-subitem" active-class="active">
+                    <span class="icon">🔔</span>
+                    <span>Finn Alerts</span>
+                  </NuxtLink>
+                </li>
+              </ul>
+            </transition>
           </li>
+          
           <li>
             <NuxtLink to="/sanity" class="nav-item" active-class="active">
               <span class="icon">🔮</span>
@@ -172,6 +222,54 @@ const handleAuthenticated = () => {
 
 .nav-links li {
   margin-bottom: 0.5rem;
+}
+
+.nav-section {
+  margin-bottom: 0.5rem;
+}
+
+.nav-dropdown {
+  cursor: pointer;
+  user-select: none;
+}
+
+.dropdown-arrow {
+  margin-left: auto;
+  font-size: 0.8rem;
+  transition: transform 0.3s ease;
+}
+
+.nav-dropdown.expanded .dropdown-arrow {
+  transform: rotate(0deg);
+}
+
+.dropdown-menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.nav-subitem {
+  padding-left: 3rem !important;
+  font-size: 0.9rem;
+}
+
+.nav-subitem .icon {
+  font-size: 1.1rem;
+}
+
+/* Dropdown transition */
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: all 0.3s ease;
+  max-height: 300px;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  max-height: 0;
+  opacity: 0;
 }
 
 .nav-item {
