@@ -102,6 +102,7 @@ const handleQuestCompleted = (xp) => {
 .left-column,
 .right-column {
   min-width: 0;
+  height: 100%;
 }
 
 @media (max-width: 1024px) {

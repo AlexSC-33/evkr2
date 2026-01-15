@@ -216,6 +216,9 @@ const refreshPrices = async () => {
         // Fetch current price
         const currentResponse = await $fetch('/api/stock-price', {
           params: { symbol: alert.symbol }
+        }).catch((err) => {
+          console.warn(`Current price unavailable for ${alert.symbol}:`, err.message)
+          return null
         })
         
         // Fetch Monday opening price
@@ -224,6 +227,9 @@ const refreshPrices = async () => {
             symbol: alert.symbol,
             date: mondayDateStr
           }
+        }).catch((err) => {
+          console.warn(`Historical price unavailable for ${alert.symbol}:`, err.message)
+          return null
         })
         
         if (currentResponse?.price) {

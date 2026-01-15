@@ -55,9 +55,10 @@ const objectives = ref([
     </div>
 
     <div class="objectives-list">
-      <div 
+      <NuxtLink
         v-for="objective in objectives" 
         :key="objective.id" 
+        to="/objectives"
         class="objective-item"
       >
         <span class="objective-icon" :style="{ color: objective.color }">{{ objective.icon }}</span>
@@ -65,8 +66,13 @@ const objectives = ref([
           <h4 class="objective-name" :style="{ color: objective.color }">{{ objective.name }}</h4>
           <p class="objective-target">{{ objective.target }}</p>
         </div>
-      </div>
+        <span class="arrow">→</span>
+      </NuxtLink>
     </div>
+
+    <NuxtLink to="/objectives" class="view-all-button">
+      View All Details →
+    </NuxtLink>
   </div>
 </template>
 
@@ -123,12 +129,25 @@ const objectives = ref([
   padding: 1rem;
   border: 1px solid #1e1e3f;
   transition: all 0.3s ease;
+  text-decoration: none;
+  position: relative;
 }
 
 .objective-item:hover {
   background: rgba(0, 255, 136, 0.05);
   transform: translateX(5px);
   border-color: currentColor;
+}
+
+.arrow {
+  color: #00ff88;
+  font-size: 1.2rem;
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.objective-item:hover .arrow {
+  opacity: 1;
 }
 
 .objective-icon {
@@ -152,5 +171,25 @@ const objectives = ref([
 .objective-target {
   font-size: 0.85rem;
   color: #8b8b9f;
+}
+
+.view-all-button {
+  display: block;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 255, 255, 0.1));
+  border: 2px solid #00ff88;
+  border-radius: 10px;
+  color: #00ff88;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.view-all-button:hover {
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 255, 255, 0.2));
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(0, 255, 136, 0.3);
 }
 </style>

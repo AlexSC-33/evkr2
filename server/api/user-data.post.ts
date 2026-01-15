@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
       xp: body.xp || 0,
       quests: body.quests || [],
       questsDate: body.questsDate || null,
+      objectives: body.objectives || [],
       updatedAt: new Date().toISOString()
     }, null, 2))
 

@@ -14,7 +14,8 @@ export default defineEventHandler(async (event) => {
       return {
         xp: 0,
         quests: [],
-        questsDate: null
+        questsDate: null,
+        objectives: []
       }
     }
   } catch (error) {

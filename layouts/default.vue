@@ -69,6 +69,12 @@ const toggleFinn = () => {
             </NuxtLink>
           </li>
           <li>
+            <NuxtLink to="/objectives" class="nav-item" active-class="active">
+              <span class="icon">🎯</span>
+              <span>Objectives</span>
+            </NuxtLink>
+          </li>
+          <li>
             <NuxtLink to="/news" class="nav-item" active-class="active">
               <span class="icon">📰</span>
               <span>News</span>
@@ -78,6 +84,12 @@ const toggleFinn = () => {
             <NuxtLink to="/devops" class="nav-item" active-class="active">
               <span class="icon">🚀</span>
               <span>DevOps</span>
+            </NuxtLink>
+          </li>
+          <li>
+            <NuxtLink to="/deployment" class="nav-item" active-class="active">
+              <span class="icon">⚙️</span>
+              <span>Deployment</span>
             </NuxtLink>
           </li>
           
