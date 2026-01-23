@@ -12,29 +12,21 @@ const portfolios = ref({
     assets: [],
     color: '#00ffff'
   },
+  pea: {
+    name: 'PEA (Actions)',
+    assets: [],
+    color: '#ffff00'
+  },
   crypto: {
     name: 'Crypto',
     assets: [],
     color: '#ff00ff'
-  },
-  bot: {
-    name: 'Trading Bot',
-    totalInvested: 0,
-    currentBalance: 0,
-    history: [],
-    color: '#ffff00'
   }
 })
-
-// Bot inputs
-const botInvestmentInput = ref(0)
-const botBalanceInput = ref(0)
 
 // UI states
 const isLoading = ref(false)
 const showAddModal = ref(false)
-const showBotInvestmentModal = ref(false)
-const showBotBalanceModal = ref(false)
 const currentPortfolio = ref(null)
 const newAsset = ref({
   symbol: '',
@@ -46,9 +38,31 @@ const newAsset = ref({
 // Load saved portfolios
 onMounted(async () => {
   try {
-    const saved = localStorage.getItem('finn2025-portfolios')
-    if (saved) {
-      portfolios.value = JSON.parse(saved)
+    // Try to load from new storage key first
+    let saved = localStorage.getItem('finn-portfolios')
+    
+    // If not found, try to migrate from old finn2025-portfolios
+    if (!saved) {
+      const oldSaved = localStorage.getItem('finn2025-portfolios')
+      if (oldSaved) {
+        console.log('Migrating data from finn2025-portfolios...')
+        const oldData = JSON.parse(oldSaved)
+        
+        // Migrate only CTO and Crypto portfolios (exclude bot)
+        portfolios.value.cto = oldData.cto || portfolios.value.cto
+        portfolios.value.crypto = oldData.crypto || portfolios.value.crypto
+        // PEA is already initialized in the ref
+        
+        // Save to new storage location
+        savePortfolios()
+        console.log('Migration completed successfully!')
+      }
+    } else {
+      const loadedData = JSON.parse(saved)
+      // Ensure all portfolios exist, merge with defaults
+      portfolios.value.cto = loadedData.cto || portfolios.value.cto
+      portfolios.value.pea = loadedData.pea || portfolios.value.pea
+      portfolios.value.crypto = loadedData.crypto || portfolios.value.crypto
     }
   } catch (error) {
     console.error('Failed to load portfolios:', error)
@@ -57,12 +71,60 @@ onMounted(async () => {
 
 // Save portfolios
 const savePortfolios = () => {
-  localStorage.setItem('finn2025-portfolios', JSON.stringify(portfolios.value))
+  localStorage.setItem('finn-portfolios', JSON.stringify(portfolios.value))
 }
 
 // Group assets by symbol for better display
 const groupedCTOAssets = computed(() => {
   const assets = portfolios.value.cto.assets
+  if (!assets || assets.length === 0) return []
+
+  const grouped = {}
+  
+  assets.forEach((asset, index) => {
+    if (!grouped[asset.symbol]) {
+      grouped[asset.symbol] = {
+        symbol: asset.symbol,
+        name: asset.name,
+        positions: [],
+        totalQuantity: 0,
+        totalInvested: 0,
+        currentValue: 0,
+        avgBuyPrice: 0,
+        currentPrice: asset.currentPrice || asset.buyPrice
+      }
+    }
+    
+    const invested = asset.quantity * asset.buyPrice
+    const currentVal = asset.quantity * (asset.currentPrice || asset.buyPrice)
+    
+    grouped[asset.symbol].positions.push({
+      index: index,
+      quantity: asset.quantity,
+      buyPrice: asset.buyPrice,
+      invested: invested,
+      currentValue: currentVal
+    })
+    
+    grouped[asset.symbol].totalQuantity += asset.quantity
+    grouped[asset.symbol].totalInvested += invested
+    grouped[asset.symbol].currentValue += currentVal
+    grouped[asset.symbol].currentPrice = asset.currentPrice || asset.buyPrice
+  })
+
+  // Calculate average buy price
+  Object.values(grouped).forEach(group => {
+    group.avgBuyPrice = group.totalInvested / group.totalQuantity
+    group.profit = group.currentValue - group.totalInvested
+    group.profitPercent = (group.profit / group.totalInvested) * 100
+  })
+
+  return Object.values(grouped)
+})
+
+// Group PEA assets by symbol for better display
+const groupedPEAAssets = computed(() => {
+  const assets = portfolios.value.pea.assets
   if (!assets || assets.length === 0) return []
 
   const grouped = {}
@@ -183,7 +245,7 @@ const refreshCryptoPrices = async () => {
 
 // Refresh stock prices using server proxy
 const refreshStockPrices = async () => {
-  const stockAssets = portfolios.value.cto.assets
+  const stockAssets = [...portfolios.value.cto.assets, ...portfolios.value.pea.assets]
   if (stockAssets.length === 0) return
 
   for (const asset of stockAssets) {
@@ -246,49 +308,14 @@ const addAsset = () => {
 // Remove asset
 const removeAsset = (portfolioKey, index) => {
   if (confirm('Remove this asset?')) {
-    portfolios.value[portfolioKey].assets.splice(index, 1)
-    savePortfolios()
+    // Ensure the portfolio exists and has assets
+    if (portfolios.value[portfolioKey] && portfolios.value[portfolioKey].assets) {
+      portfolios.value[portfolioKey].assets.splice(index, 1)
+      savePortfolios()
+      // Force refresh of computed properties
+      nextTick()
+    }
   }
-}
-
-// Add bot investment
-const addBotInvestment = () => {
-  if (!botInvestmentInput.value || botInvestmentInput.value <= 0) {
-    alert('Please enter a valid investment amount')
-    return
-  }
-
-  portfolios.value.bot.totalInvested += botInvestmentInput.value
-  portfolios.value.bot.history = portfolios.value.bot.history || []
-  portfolios.value.bot.history.unshift({
-    type: 'investment',
-    amount: botInvestmentInput.value,
-    date: new Date().toISOString()
-  })
-
-  botInvestmentInput.value = 0
-  showBotInvestmentModal.value = false
-  savePortfolios()
-}
-
-// Update bot balance
-const updateBotBalance = () => {
-  if (botBalanceInput.value < 0) {
-    alert('Please enter a valid balance amount')
-    return
-  }
-
-  portfolios.value.bot.currentBalance = botBalanceInput.value
-  portfolios.value.bot.history = portfolios.value.bot.history || []
-  portfolios.value.bot.history.unshift({
-    type: 'balance',
-    amount: botBalanceInput.value,
-    date: new Date().toISOString()
-  })
-
-  botBalanceInput.value = 0
-  showBotBalanceModal.value = false
-  savePortfolios()
 }
 
 // Format currency
@@ -296,14 +323,6 @@ const formatCurrency = (value) => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD'
-  }).format(value)
-}
-
-// Format currency in Euros (for bot only)
-const formatEuro = (value) => {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR'
   }).format(value)
 }
 
@@ -322,14 +341,15 @@ const overallStats = computed(() => {
   totalInvested += ctoStats.totalInvested
   currentValue += ctoStats.currentValue
 
+  // Add PEA stats
+  const peaStats = calculateStats(portfolios.value.pea)
+  totalInvested += peaStats.totalInvested
+  currentValue += peaStats.currentValue
+
   // Add Crypto stats
   const cryptoStats = calculateStats(portfolios.value.crypto)
   totalInvested += cryptoStats.totalInvested
   currentValue += cryptoStats.currentValue
-
-  // Add Bot stats
-  totalInvested += portfolios.value.bot.totalInvested || 0
-  currentValue += portfolios.value.bot.currentBalance || 0
 
   const profit = currentValue - totalInvested
   const profitPercent = totalInvested > 0 ? (profit / totalInvested) * 100 : 0
@@ -348,7 +368,7 @@ const overallStats = computed(() => {
     <header class="page-header">
       <div class="header-content">
         <div>
-          <h1 class="page-title">Finn 2025</h1>
+          <h1 class="page-title">Finn</h1>
           <p class="page-subtitle">Your Financial Performance Tracker</p>
         </div>
         <button 
@@ -471,6 +491,96 @@ const overallStats = computed(() => {
         </div>
       </div>
 
+      <!-- PEA Portfolio -->
+      <div class="portfolio-card" :style="{ '--card-color': portfolios.pea.color }">
+        <div class="card-header">
+          <h2>{{ portfolios.pea.name }}</h2>
+          <button class="add-btn" @click="openAddModal('pea')">+ Add Stock</button>
+        </div>
+
+        <div class="portfolio-stats">
+          <div class="stat">
+            <span class="label">Invested:</span>
+            <span class="value">{{ formatCurrency(calculateStats(portfolios.pea).totalInvested) }}</span>
+          </div>
+          <div class="stat">
+            <span class="label">Current:</span>
+            <span class="value">{{ formatCurrency(calculateStats(portfolios.pea).currentValue) }}</span>
+          </div>
+          <div class="stat" :class="{ profit: calculateStats(portfolios.pea).profit >= 0, loss: calculateStats(portfolios.pea).profit < 0 }">
+            <span class="label">P&L:</span>
+            <span class="value">{{ formatPercent(calculateStats(portfolios.pea).profitPercent) }}</span>
+          </div>
+        </div>
+
+        <div class="assets-list">
+          <div v-if="portfolios.pea.assets.length === 0" class="empty-state">
+            No stocks added yet
+          </div>
+          
+          <!-- Grouped Stock Display -->
+          <div v-for="group in groupedPEAAssets" :key="group.symbol" class="stock-group">
+            <div class="stock-group-header">
+              <div class="stock-main-info">
+                <span class="stock-symbol">{{ group.symbol }}</span>
+                <span class="stock-name">{{ group.name }}</span>
+              </div>
+              <div class="stock-summary">
+                <div class="summary-item">
+                  <span class="summary-label">Total Shares</span>
+                  <span class="summary-value">{{ group.totalQuantity.toFixed(4) }}</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Avg Buy Price</span>
+                  <span class="summary-value">{{ formatCurrency(group.avgBuyPrice) }}</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Current Price</span>
+                  <span class="summary-value">{{ formatCurrency(group.currentPrice) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="stock-totals">
+              <div class="total-item">
+                <span class="total-label">Total Invested</span>
+                <span class="total-value">{{ formatCurrency(group.totalInvested) }}</span>
+              </div>
+              <div class="total-item">
+                <span class="total-label">Current Value</span>
+                <span class="total-value">{{ formatCurrency(group.currentValue) }}</span>
+              </div>
+              <div class="total-item highlight" :class="{ profit: group.profit >= 0, loss: group.profit < 0 }">
+                <span class="total-label">Profit/Loss</span>
+                <div class="pl-values">
+                  <span class="pl-amount">{{ formatCurrency(group.profit) }}</span>
+                  <span class="pl-percent">{{ formatPercent(group.profitPercent) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Individual Positions -->
+            <div v-if="group.positions.length > 1" class="positions-toggle">
+              <details>
+                <summary>{{ group.positions.length }} positions • Click to expand</summary>
+                <div class="positions-list">
+                  <div v-for="position in group.positions" :key="position.index" class="position-item">
+                    <div class="position-info">
+                      <span class="position-qty">{{ position.quantity.toFixed(4) }} shares @ {{ formatCurrency(position.buyPrice) }}</span>
+                      <span class="position-invested">Invested: {{ formatCurrency(position.invested) }}</span>
+                    </div>
+                    <button class="remove-btn-small" @click="removeAsset('pea', position.index)">×</button>
+                  </div>
+                </div>
+              </details>
+            </div>
+            <div v-else class="single-position-actions">
+              <button class="remove-btn-inline" @click="removeAsset('pea', group.positions[0].index)">Remove Position</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Crypto Portfolio -->
       <div class="portfolio-card" :style="{ '--card-color': portfolios.crypto.color }">
         <div class="card-header">
@@ -528,83 +638,6 @@ const overallStats = computed(() => {
             <button class="remove-btn" @click="removeAsset('crypto', index)">×</button>
           </div>
         </div>
-      </div>
-
-      <!-- Bot Portfolio -->
-      <div class="portfolio-card" :style="{ '--card-color': portfolios.bot.color }">
-        <div class="card-header">
-          <h2>{{ portfolios.bot.name }}</h2>
-          <div class="bot-header-actions">
-            <button class="add-btn" @click="showBotInvestmentModal = true">+ Add Investment</button>
-            <button class="add-btn" @click="showBotBalanceModal = true">Update Balance</button>
-          </div>
-        </div>
-
-        <div class="portfolio-stats">
-          <div class="stat">
-            <span class="label">Invested:</span>
-            <span class="value">{{ formatEuro(portfolios.bot.totalInvested || 0) }}</span>
-          </div>
-          <div class="stat">
-            <span class="label">Current:</span>
-            <span class="value">{{ formatEuro(portfolios.bot.currentBalance || 0) }}</span>
-          </div>
-          <div class="stat" :class="{ profit: (portfolios.bot.currentBalance || 0) >= (portfolios.bot.totalInvested || 0), loss: (portfolios.bot.currentBalance || 0) < (portfolios.bot.totalInvested || 0) }">
-            <span class="label">P&L:</span>
-            <span class="value">{{ formatPercent(portfolios.bot.totalInvested > 0 ? ((portfolios.bot.currentBalance || 0) - (portfolios.bot.totalInvested || 0)) / portfolios.bot.totalInvested * 100 : 0) }}</span>
-          </div>
-        </div>
-
-        <div class="assets-list">
-          <div v-if="!portfolios.bot.history || portfolios.bot.history.length === 0" class="empty-state">
-            No transactions yet
-          </div>
-          <div v-for="(entry, index) in portfolios.bot.history" :key="index" class="asset-item bot-entry">
-            <div class="asset-info">
-              <span class="asset-symbol">{{ entry.type === 'investment' ? '💰 Investment' : '📊 Balance Update' }}</span>
-              <span class="asset-name">{{ new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }}</span>
-            </div>
-            <div class="asset-details">
-              <div class="detail-row">
-                <span class="bot-entry-amount">{{ formatEuro(entry.amount) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Bot Investment Modal -->
-    <div v-if="showBotInvestmentModal" class="modal-overlay" @click.self="showBotInvestmentModal = false">
-      <div class="modal">
-        <h3>Add Investment</h3>
-        <form @submit.prevent="addBotInvestment">
-          <div class="form-group">
-            <label>Amount (EUR)</label>
-            <input v-model.number="botInvestmentInput" type="number" step="0.01" placeholder="500.00" required autofocus>
-          </div>
-          <div class="modal-actions">
-            <button type="button" class="cancel-btn" @click="showBotInvestmentModal = false">Cancel</button>
-            <button type="submit" class="submit-btn">Add Investment</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Bot Balance Modal -->
-    <div v-if="showBotBalanceModal" class="modal-overlay" @click.self="showBotBalanceModal = false">
-      <div class="modal">
-        <h3>Update Current Balance</h3>
-        <form @submit.prevent="updateBotBalance">
-          <div class="form-group">
-            <label>Current Balance (EUR)</label>
-            <input v-model.number="botBalanceInput" type="number" step="0.01" placeholder="550.00" required autofocus>
-          </div>
-          <div class="modal-actions">
-            <button type="button" class="cancel-btn" @click="showBotBalanceModal = false">Cancel</button>
-            <button type="submit" class="submit-btn">Update Balance</button>
-          </div>
-        </form>
       </div>
     </div>
 
@@ -675,7 +708,7 @@ const overallStats = computed(() => {
 .page-title {
   font-size: 2.5rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #00ffff, #ff00ff, #ffff00);
+  background: linear-gradient(135deg, #00ffff, #ff00ff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1109,26 +1142,7 @@ const overallStats = computed(() => {
   color: white;
 }
 
-/* Bot Header Actions */
-.bot-header-actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-/* Bot Entry Styles */
-.bot-entry .asset-info {
-  min-width: 200px;
-}
-
-.bot-entry-amount {
-  color: #ffff00;
-  font-size: 1.1rem;
-  font-weight: 700;
-}
-
-/* Modal Styles */
-
+/* Asset Item Styles */
 .asset-item {
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid #1e1e3f;
@@ -1246,6 +1260,7 @@ const overallStats = computed(() => {
   color: white;
 }
 
+/* Modal Styles */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1359,125 +1374,6 @@ const overallStats = computed(() => {
   box-shadow: 0 4px 12px rgba(0, 255, 255, 0.4);
 }
 
-.bot-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid #1e1e3f;
-}
-
-.bot-input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.bot-input-group label {
-  color: #8b8b9f;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.input-with-btn {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.input-with-btn input {
-  flex: 1;
-  padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid #1e1e3f;
-  border-radius: 8px;
-  color: #ffffff;
-  font-size: 1rem;
-}
-
-.input-with-btn input:focus {
-  outline: none;
-  border-color: #ffff00;
-  box-shadow: 0 0 10px rgba(255, 255, 0, 0.3);
-}
-
-.inline-btn {
-  padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, #ffff00 0%, #cccc00 100%);
-  color: #0a0a0f;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-}
-
-.inline-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 255, 0, 0.4);
-}
-
-.bot-stats {
-  margin-bottom: 1.5rem;
-}
-
-.bot-stats .stat .percent {
-  display: block;
-  font-size: 0.9rem;
-  margin-top: 0.25rem;
-}
-
-.bot-history {
-  margin-top: 1.5rem;
-}
-
-.bot-history h4 {
-  color: #8b8b9f;
-  font-size: 1rem;
-  margin-bottom: 1rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.history-item {
-  display: grid;
-  grid-template-columns: auto auto 1fr auto;
-  gap: 0.75rem;
-  align-items: center;
-  padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid #1e1e3f;
-  border-radius: 6px;
-  font-size: 0.9rem;
-}
-
-.history-date {
-  color: #6b6b7f;
-  font-size: 0.8rem;
-}
-
-.history-type {
-  font-size: 1.2rem;
-}
-
-.history-label {
-  color: #8b8b9f;
-}
-
-.history-amount {
-  color: #ffffff;
-  font-weight: 600;
-}
-
 @media (max-width: 768px) {
   .portfolios-grid {
     grid-template-columns: 1fr;
@@ -1489,10 +1385,6 @@ const overallStats = computed(() => {
 
   .asset-pl {
     grid-column: span 1;
-  }
-
-  .bot-controls {
-    gap: 1.5rem;
   }
 }
 </style>

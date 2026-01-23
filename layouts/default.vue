@@ -29,7 +29,11 @@ watch(() => route.path, (newPath) => {
 
 // Check if auth modal should be shown on mount
 onMounted(() => {
-  if (route.query.showAuth === 'true') {
+  // Show auth modal if not authenticated
+  if (!isAuthenticated.value && !isFreeAccess.value) {
+    showAuthModal.value = true
+    redirectPath.value = route.path !== '/' ? route.path : ''
+  } else if (route.query.showAuth === 'true') {
     showAuthModal.value = true
     redirectPath.value = (route.query.redirect as string) || ''
   }
@@ -108,21 +112,15 @@ const toggleFinn = () => {
             <transition name="dropdown">
               <ul v-if="finnExpanded" class="dropdown-menu">
                 <li>
-                  <NuxtLink to="/finn-2025" class="nav-item nav-subitem" active-class="active">
-                    <span class="icon">📈</span>
-                    <span>Finn 2025</span>
-                  </NuxtLink>
-                </li>
-                <li>
-                  <NuxtLink to="/finn-2026" class="nav-item nav-subitem" active-class="active">
-                    <span class="icon">📉</span>
-                    <span>Finn 2026</span>
+                  <NuxtLink to="/finn" class="nav-item nav-subitem" active-class="active">
+                    <span class="icon">📊</span>
+                    <span>Portfolio</span>
                   </NuxtLink>
                 </li>
                 <li>
                   <NuxtLink to="/finn-alerts" class="nav-item nav-subitem" active-class="active">
                     <span class="icon">🔔</span>
-                    <span>Finn Alerts</span>
+                    <span>Alerts</span>
                   </NuxtLink>
                 </li>
               </ul>
