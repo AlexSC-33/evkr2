@@ -8,6 +8,8 @@ export default defineNuxtConfig({
     gnewsApiKey: process.env.GNEWS_API_KEY || '',
     authSecret: process.env.AUTH_SECRET || '',
     accessCode: process.env.ACCESS_CODE || '',
+    authPasswordHash: process.env.AUTH_PASSWORD_HASH || '',
+    premiumUserId: process.env.PREMIUM_USER_ID || '',
     
     // Public keys (exposed to client)
     public: {

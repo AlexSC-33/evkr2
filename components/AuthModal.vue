@@ -13,9 +13,6 @@ const accessCode = ref('')
 const error = ref('')
 const isLoading = ref(false)
 
-// Access code (you can change this to whatever you want)
-const VALID_ACCESS_CODE = 'EVKR2025'
-
 const handleSubmit = async () => {
   if (!accessCode.value.trim()) {
     error.value = 'Please enter an access code'
@@ -25,29 +22,39 @@ const handleSubmit = async () => {
   isLoading.value = true
   error.value = ''
   
-  // Simulate a small delay for UX
-  await new Promise(resolve => setTimeout(resolve, 500))
-  
-  if (accessCode.value.trim().toUpperCase() === VALID_ACCESS_CODE) {
-    // Set authentication cookie for 24 hours
-    const authCookie = useCookie('auth_session', {
-      maxAge: 60 * 60 * 24 // 24 hours
+  try {
+    // Appel à l'API d'authentification sécurisée
+    const response = await $fetch('/api/auth', {
+      method: 'POST',
+      body: {
+        accessCode: accessCode.value
+      }
     })
-    authCookie.value = 'authenticated'
     
-    emit('authenticated')
-    emit('close')
-    
-    // Redirect to the desired page if specified
-    if (props.redirectPath) {
-      await navigateTo(props.redirectPath)
+    if (response.success) {
+      // Authentication réussie
+      emit('authenticated')
+      emit('close')
+      
+      // Rediriger vers la page désirée si spécifiée
+      if (props.redirectPath) {
+        await navigateTo(props.redirectPath)
+      }
+    } else {
+      error.value = response.message || 'Invalid access code'
+      accessCode.value = ''
     }
-  } else {
-    error.value = 'Invalid access code'
+  } catch (err: any) {
+    console.error('Authentication error:', err)
+    if (err.statusCode === 429) {
+      error.value = 'Too many attempts. Please try again later.'
+    } else {
+      error.value = 'Authentication failed. Please try again.'
+    }
     accessCode.value = ''
+  } finally {
+    isLoading.value = false
   }
-  
-  isLoading.value = false
 }
 
 const handleFreeAccess = () => {
