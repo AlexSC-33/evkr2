@@ -41,12 +41,20 @@ export default defineEventHandler(async (event) => {
     // Hasher le mot de passe fourni
     const providedHash = hashData(body.accessCode.trim().toUpperCase())
 
+    // DEBUG - À retirer en production
+    console.log('🔍 DEBUG AUTH:')
+    console.log('  - Access code reçu:', body.accessCode)
+    console.log('  - Access code normalisé:', body.accessCode.trim().toUpperCase())
+    console.log('  - Hash fourni:', providedHash)
+    console.log('  - Hash attendu:', validPasswordHash)
+    console.log('  - Match:', providedHash === validPasswordHash)
+
     // Comparer les hashes
     if (providedHash === validPasswordHash) {
       // Authentification réussie - définir les cookies
       setCookie(event, 'auth_session', 'authenticated', {
         maxAge: 60 * 60 * 24, // 24 heures
-        httpOnly: true,
+        httpOnly: false, // Permet au middleware client de lire le cookie
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict'
       })
@@ -55,7 +63,7 @@ export default defineEventHandler(async (event) => {
       if (premiumUserId) {
         setCookie(event, 'userId', premiumUserId, {
           maxAge: 60 * 60 * 24 * 365, // 1 an
-          httpOnly: true,
+          httpOnly: false, // Permet au code client de lire le cookie
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'strict'
         })

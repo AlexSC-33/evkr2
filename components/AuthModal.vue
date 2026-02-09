@@ -31,7 +31,10 @@ const handleSubmit = async () => {
       }
     })
     
+    console.log('🔍 Réponse du serveur:', response)
+    
     if (response.success) {
+      console.log('✅ Authentification réussie ! Fermeture du modal...')
       // Authentication réussie
       emit('authenticated')
       emit('close')
@@ -41,6 +44,7 @@ const handleSubmit = async () => {
         await navigateTo(props.redirectPath)
       }
     } else {
+      console.log('❌ Authentification échouée:', response.message)
       error.value = response.message || 'Invalid access code'
       accessCode.value = ''
     }

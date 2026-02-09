@@ -51,6 +51,9 @@ const handleLogin = () => {
 
 const handleAuthenticated = () => {
   // Cookie is already set in AuthModal component
+  showAuthModal.value = false
+  // Recharger les données de l'utilisateur
+  window.location.reload()
 }
 
 const toggleFinn = () => {
@@ -96,6 +99,18 @@ const toggleFinn = () => {
               <span>Deployment</span>
             </NuxtLink>
           </li>
+          <li>
+            <NuxtLink to="/learning-korean" class="nav-item" active-class="active">
+              <span class="icon">🇰🇷</span>
+              <span>Learning Korean</span>
+            </NuxtLink>
+          </li>
+          <li>
+            <NuxtLink to="/learning-english" class="nav-item" active-class="active">
+              <span class="icon">🇬🇧</span>
+              <span>Learning English</span>
+            </NuxtLink>
+          </li>
           
           <!-- Finn Section with Dropdown -->
           <li class="nav-section">
@@ -112,9 +127,21 @@ const toggleFinn = () => {
             <transition name="dropdown">
               <ul v-if="finnExpanded" class="dropdown-menu">
                 <li>
-                  <NuxtLink to="/finn" class="nav-item nav-subitem" active-class="active">
-                    <span class="icon">📊</span>
-                    <span>Portfolio</span>
+                  <NuxtLink to="/finn/cto" class="nav-item nav-subitem" active-class="active">
+                    <span class="icon">📈</span>
+                    <span>CTO</span>
+                  </NuxtLink>
+                </li>
+                <li>
+                  <NuxtLink to="/finn/pea" class="nav-item nav-subitem" active-class="active">
+                    <span class="icon">🏦</span>
+                    <span>PEA</span>
+                  </NuxtLink>
+                </li>
+                <li>
+                  <NuxtLink to="/finn/crypto" class="nav-item nav-subitem" active-class="active">
+                    <span class="icon">₿</span>
+                    <span>Crypto</span>
                   </NuxtLink>
                 </li>
                 <li>
@@ -260,9 +287,20 @@ const toggleFinn = () => {
   overflow: hidden;
 }
 
+.dropdown-menu li {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
 .nav-subitem {
   padding-left: 3rem !important;
   font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.nav-subitem:hover {
+  opacity: 1;
 }
 
 .nav-subitem .icon {
@@ -330,6 +368,10 @@ const toggleFinn = () => {
 .icon {
   font-size: 1.3rem;
   filter: drop-shadow(0 0 5px currentColor);
+  display: inline-block;
+  width: 1.5rem;
+  text-align: center;
+  flex-shrink: 0;
 }
 
 .lock-badge {

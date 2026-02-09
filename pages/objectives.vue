@@ -87,11 +87,18 @@ onMounted(async () => {
     const response = await fetch('/api/user-data')
     const data = await response.json()
     
+    console.log('🔍 Données reçues:', data)
+    console.log('🔍 Objectifs:', data.objectives)
+    console.log('🔍 Premier objectif:', JSON.stringify(data.objectives[0], null, 2))
+    
     if (data.objectives && data.objectives.length > 0) {
       objectives.value = data.objectives
+      console.log('✅ Objectifs chargés:', objectives.value)
+    } else {
+      console.log('⚠️ Aucun objectif trouvé, utilisation des valeurs par défaut')
     }
   } catch (error) {
-    console.error('Error loading objectives:', error)
+    console.error('❌ Erreur lors du chargement des objectifs:', error)
   } finally {
     isLoading.value = false
   }

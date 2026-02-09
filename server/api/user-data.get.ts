@@ -49,7 +49,12 @@ export default defineEventHandler(async (event) => {
         xp: typeof parsed.xp === 'number' ? parsed.xp : 0,
         quests: Array.isArray(parsed.quests) ? parsed.quests : [],
         questsDate: parsed.questsDate || null,
-        objectives: Array.isArray(parsed.objectives) ? parsed.objectives : []
+        objectives: Array.isArray(parsed.objectives) ? parsed.objectives : [],
+        portfolios: Array.isArray(parsed.portfolios) ? parsed.portfolios : [],
+        koreanTasks: Array.isArray(parsed.koreanTasks) ? parsed.koreanTasks : [],
+        koreanTasksDate: parsed.koreanTasksDate || null,
+        englishTasks: Array.isArray(parsed.englishTasks) ? parsed.englishTasks : [],
+        englishTasksDate: parsed.englishTasksDate || null
       }
     } catch (err) {
       // File doesn't exist yet
@@ -57,7 +62,12 @@ export default defineEventHandler(async (event) => {
         xp: 0,
         quests: [],
         questsDate: null,
-        objectives: []
+        objectives: [],
+        portfolios: [],
+        koreanTasks: [],
+        koreanTasksDate: null,
+        englishTasks: [],
+        englishTasksDate: null
       }
     }
   } catch (error: any) {

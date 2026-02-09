@@ -48,9 +48,52 @@ export default defineEventHandler(async (event) => {
     const objectives = Array.isArray(body.objectives)
       ? body.objectives.slice(0, 100).map((obj: any) => ({
           id: sanitizeInput(String(obj.id || ''), 100),
-          title: sanitizeInput(String(obj.title || ''), 500),
-          completed: Boolean(obj.completed),
-          createdAt: obj.createdAt || new Date().toISOString()
+          name: sanitizeInput(String(obj.name || obj.title || ''), 200),
+          icon: sanitizeInput(String(obj.icon || ''), 10),
+          color: sanitizeInput(String(obj.color || '#00ffff'), 20),
+          target: sanitizeInput(String(obj.target || ''), 500),
+          notes: sanitizeInput(String(obj.notes || ''), 5000),
+          todos: Array.isArray(obj.todos) 
+            ? obj.todos.slice(0, 100).map((todo: any) => ({
+                id: typeof todo.id === 'number' ? todo.id : Date.now(),
+                text: sanitizeInput(String(todo.text || ''), 500),
+                completed: Boolean(todo.completed)
+              }))
+            : []
+        }))
+      : []
+
+    const portfolios = Array.isArray(body.portfolios)
+      ? body.portfolios.slice(0, 10).map((portfolio: any) => ({
+          id: sanitizeInput(String(portfolio.id || ''), 100),
+          name: sanitizeInput(String(portfolio.name || ''), 200),
+          type: sanitizeInput(String(portfolio.type || 'stocks'), 50),
+          stocks: Array.isArray(portfolio.stocks)
+            ? portfolio.stocks.slice(0, 100).map((stock: any) => ({
+                symbol: sanitizeInput(String(stock.symbol || ''), 20),
+                quantity: typeof stock.quantity === 'number' ? Math.max(0, stock.quantity) : 0,
+                purchasePrice: typeof stock.purchasePrice === 'number' ? Math.max(0, stock.purchasePrice) : 0,
+                purchaseDate: sanitizeInput(String(stock.purchaseDate || ''), 50)
+              }))
+            : []
+        }))
+      : []
+
+    const koreanTasks = Array.isArray(body.koreanTasks)
+      ? body.koreanTasks.slice(0, 100).map((task: any) => ({
+          id: typeof task.id === 'number' ? task.id : Date.now(),
+          text: sanitizeInput(String(task.text || ''), 500),
+          completed: Boolean(task.completed),
+          url: task.url ? sanitizeInput(String(task.url), 1000) : undefined
+        }))
+      : []
+
+    const englishTasks = Array.isArray(body.englishTasks)
+      ? body.englishTasks.slice(0, 100).map((task: any) => ({
+          id: typeof task.id === 'number' ? task.id : Date.now(),
+          text: sanitizeInput(String(task.text || ''), 500),
+          completed: Boolean(task.completed),
+          url: task.url ? sanitizeInput(String(task.url), 1000) : undefined
         }))
       : []
 
@@ -93,6 +136,11 @@ export default defineEventHandler(async (event) => {
       quests,
       questsDate: body.questsDate || null,
       objectives,
+      portfolios,
+      koreanTasks,
+      koreanTasksDate: body.koreanTasksDate || null,
+      englishTasks,
+      englishTasksDate: body.englishTasksDate || null,
       updatedAt: new Date().toISOString()
     }, null, 2))
 
